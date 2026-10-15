@@ -287,6 +287,10 @@ addTab("Visuals", "◈")
 addTab("Environment", "☾")
 addTab("Movement", "➤")
 addTab("Settings", "⚙")
+addTab("Roles", "♜")
+addTab("Round", "◷")
+addTab("Player Test", "✦")
+addTab("ESP", "◎")
 
 local home = pages.Home
 heading(home, "Welcome to Starfall", "A personal testing panel for your own Roblox Studio experience.")
@@ -433,6 +437,117 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
 end)
+
+
+-- Server-authorized test controls. The server rejects calls outside Studio by default.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local testRemote = ReplicatedStorage:WaitForChild("StarfallTestAction", 10)
+local function requestTest(actionName, value)
+    if not testRemote then
+        notify("Falta StarfallServer.server.lua en ServerScriptService.", COLORS.danger)
+        return nil
+    end
+    local ok, allowed, message = pcall(function()
+        return testRemote:InvokeServer(actionName, value)
+    end)
+    if not ok then
+        notify("No se pudo contactar el servidor de pruebas.", COLORS.danger)
+        warn("[Starfall] Remote error:", allowed)
+        return nil
+    end
+    notify(message or (allowed and "Acción completada." or "Acción rechazada."), allowed and COLORS.success or COLORS.danger)
+    return allowed
+end
+
+local roles = pages.Roles
+heading(roles, "Role testing", "Only changes test attributes used by your own game. Wire these into your round system.")
+for _, roleName in ipairs({"Murderer", "Sheriff", "Innocent"}) do
+    action(roles, "Set my test role: " .. roleName, "Server-validated; stores StarfallTestRole on your player.", function()
+        requestTest("SetTestRole", roleName)
+    end)
+end
+action(roles, "Clear test role", "Removes the Starfall test-role attribute.", function()
+    requestTest("ClearTestRole")
+end)
+
+local round = pages.Round
+heading(round, "Round controls", "Developer test flags; connect these to your own round manager.")
+action(round, "Mark test round ended", "Sets Workspace attribute StarfallTestRoundEnded = true.", function()
+    requestTest("EndTestRound")
+end)
+action(round, "Reset test round flag", "Sets the test round flag back to false.", function()
+    requestTest("ResetTestRound")
+end)
+action(round, "Teleport to TestSpawn", "Uses Workspace > StarfallTestPoints > TestSpawn.", function()
+    requestTest("TeleportTestPoint", "TestSpawn")
+end)
+action(round, "Teleport to GunDrop", "Uses Workspace > StarfallTestPoints > GunDrop.", function()
+    requestTest("TeleportTestPoint", "GunDrop")
+end)
+
+local playerTest = pages["Player Test"]
+heading(playerTest, "Player test tools", "Server-side test values; not a live economy or production inventory.")
+action(playerTest, "Grant 100 test coins", "Adds 100 to the StarfallTestCoins attribute.", function()
+    requestTest("GrantTestCoins", 100)
+end)
+action(playerTest, "Reset my test data", "Clears test role and test coin attributes.", function()
+    requestTest("ResetMyTestData")
+end)
+action(playerTest, "Give test knife", "Clones ServerStorage > StarfallTestTools > TestKnife if configured.", function()
+    requestTest("GiveTestTool", "TestKnife")
+end)
+action(playerTest, "Give test gun", "Clones ServerStorage > StarfallTestTools > TestGun if configured.", function()
+    requestTest("GiveTestTool", "TestGun")
+end)
+
+local espPage = pages.ESP
+heading(espPage, "Role ESP", "Highlights only players with StarfallTestRole attributes in your own test experience.")
+local espEnabled = false
+local highlights = {}
+local function clearRoleHighlights()
+    for playerTarget, highlight in pairs(highlights) do
+        if highlight and highlight.Parent then highlight:Destroy() end
+        highlights[playerTarget] = nil
+    end
+end
+local function refreshRoleHighlights()
+    clearRoleHighlights()
+    if not espEnabled then return end
+    for _, target in ipairs(Players:GetPlayers()) do
+        if target ~= player and target:GetAttribute("StarfallTestRole") then
+            local char = target.Character
+            if char then
+                local role = target:GetAttribute("StarfallTestRole")
+                local h = Instance.new("Highlight")
+                h.Name = "StarfallTestRoleHighlight"
+                h.Adornee = char
+                h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                h.FillTransparency = 0.55
+                h.OutlineTransparency = 0
+                h.FillColor = role == "Murderer" and COLORS.danger or (role == "Sheriff" and COLORS.blue or COLORS.success)
+                h.OutlineColor = h.FillColor
+                h.Parent = gui
+                highlights[target] = h
+            end
+        end
+    end
+end
+toggle(espPage, "Enable role highlights", "Only reads StarfallTestRole attributes.", false, function(value)
+    espEnabled = value
+    refreshRoleHighlights()
+end)
+Players.PlayerAdded:Connect(function(p)
+    p:GetAttributeChangedSignal("StarfallTestRole"):Connect(refreshRoleHighlights)
+    p.CharacterAdded:Connect(refreshRoleHighlights)
+end)
+for _, p in ipairs(Players:GetPlayers()) do
+    p:GetAttributeChangedSignal("StarfallTestRole"):Connect(refreshRoleHighlights)
+    p.CharacterAdded:Connect(refreshRoleHighlights)
+end
+Players.PlayerRemoving:Connect(function(p)
+    if highlights[p] then highlights[p]:Destroy(); highlights[p] = nil end
+end)
+
 
 selectTab("Home")
 notify("Starfall listo. RightShift abre/cierra el panel.", COLORS.success)
