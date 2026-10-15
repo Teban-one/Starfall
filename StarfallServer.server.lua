@@ -40,6 +40,18 @@ local function handleAction(player, actionName, value)
         if typeof(value) ~= "string" or not ALLOWED_ROLES[value] then return false, "Rol de prueba no válido." end
         player:SetAttribute("StarfallTestRole", value)
         return true, "Rol de prueba establecido: " .. value
+    elseif actionName == "AssignTestRole" then
+        if typeof(value) ~= "table" or typeof(value.UserId) ~= "number" or not ALLOWED_ROLES[value.Role] then return false, "Asignación de rol no válida." end
+        local target = Players:GetPlayerByUserId(value.UserId)
+        if not target then return false, "Ese jugador ya no está en la sesión." end
+        target:SetAttribute("StarfallTestRole", value.Role)
+        return true, ("Rol de prueba %s asignado a %s."):format(value.Role, target.Name)
+    elseif actionName == "ClearPlayerTestRole" then
+        if typeof(value) ~= "number" then return false, "Jugador no válido." end
+        local target = Players:GetPlayerByUserId(value)
+        if not target then return false, "Ese jugador ya no está en la sesión." end
+        target:SetAttribute("StarfallTestRole", nil)
+        return true, "Rol de prueba eliminado para " .. target.Name
     elseif actionName == "ClearTestRole" then
         player:SetAttribute("StarfallTestRole", nil)
         return true, "Rol de prueba eliminado."
