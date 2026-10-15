@@ -513,9 +513,63 @@ action(roles, "Clear preview role", "Removes the local preview tag.", function()
     refreshRoleHighlights()
     notify("Vista previa de rol eliminada.", COLORS.success)
 end)
-action(roles, "Apply role on server (Studio only)", "Requires StarfallServer.server.lua in ServerScriptService.", function()
+action(roles, "Apply role on server (Studio only)", "Sets your own server-side test role.", function()
     requestTest("SetTestRole", player:GetAttribute("StarfallTestRole"))
 end)
+
+local rosterFrame = make("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y}, roles)
+local rosterLayout = Instance.new("UIListLayout")
+rosterLayout.Padding = UDim.new(0, 6)
+rosterLayout.SortOrder = Enum.SortOrder.LayoutOrder
+rosterLayout.Parent = rosterFrame
+local rosterHint = make("TextLabel", {
+    BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30),
+    Font = Enum.Font.Gotham, Text = "Server role assignment • Studio test only",
+    TextColor3 = COLORS.muted, TextSize = 10, TextWrapped = true,
+}, rosterFrame)
+local function refreshRoleRoster()
+    for _, child in ipairs(rosterFrame:GetChildren()) do
+        if child ~= rosterLayout and child ~= rosterHint then child:Destroy() end
+    end
+    for _, target in ipairs(Players:GetPlayers()) do
+        local row = make("Frame", {BackgroundColor3 = COLORS.panel2, Size = UDim2.new(1, 0, 0, 86)}, rosterFrame)
+        corner(row, 8)
+        make("TextLabel", {
+            BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 5),
+            Size = UDim2.new(1, -20, 0, 18), Font = Enum.Font.GothamMedium,
+            Text = target.DisplayName .. "  (@" .. target.Name .. ")",
+            TextColor3 = COLORS.text, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
+        }, row)
+        for index, roleName in ipairs({"Murderer", "Sheriff", "Innocent"}) do
+            local button = make("TextButton", {
+                Position = UDim2.new((index - 1) / 3, 6, 0, 31),
+                Size = UDim2.new(1 / 3, -8, 0, 25),
+                BackgroundColor3 = rolePreviewColors[roleName], BorderSizePixel = 0,
+                Font = Enum.Font.GothamBold, Text = roleName, TextSize = 9,
+                TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = true,
+            }, row)
+            corner(button, 6)
+            button.Activated:Connect(function()
+                local ok = requestTest("AssignTestRole", {UserId = target.UserId, Role = roleName})
+                if ok then task.defer(refreshRoleHighlights) end
+            end)
+        end
+        local clear = make("TextButton", {
+            Position = UDim2.new(0, 6, 0, 60), Size = UDim2.new(1, -12, 0, 20),
+            BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
+            Font = Enum.Font.Gotham, Text = "Clear role", TextSize = 9, TextColor3 = COLORS.muted,
+        }, row)
+        corner(clear, 5)
+        clear.Activated:Connect(function()
+            requestTest("ClearPlayerTestRole", target.UserId)
+            task.defer(refreshRoleHighlights)
+        end)
+    end
+end
+action(roles, "Refresh player roster", "Reload players and assign test roles from the server.", refreshRoleRoster)
+refreshRoleRoster()
+Players.PlayerAdded:Connect(function() task.defer(refreshRoleRoster) end)
+Players.PlayerRemoving:Connect(function() task.defer(refreshRoleRoster) end)
 
 local round = pages.Round
 heading(round, "Round controls", "Developer test flags; connect these to your own round manager.")
@@ -583,12 +637,11 @@ local function refreshRoleHighlights()
     end
     local tagged = 0
     for _, target in ipairs(Players:GetPlayers()) do
-        if true then
-            local role = target:GetAttribute("StarfallTestRole")
-            local char = target.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local color = roleColors[role]
-            if color and char and root then
+        local role = target:GetAttribute("StarfallTestRole")
+        local char = target.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local color = roleColors[role]
+        if color and char and root then
                 tagged += 1
                 local h = Instance.new("Highlight")
                 h.Name = "StarfallRoleHighlight"
@@ -619,7 +672,6 @@ local function refreshRoleHighlights()
                 text.Text = string.upper(role) .. "  •  " .. target.DisplayName
                 text.Parent = billboard
                 labels[target] = billboard
-            end
         end
     end
     espStatus.Text = ("ESP ON  •  %d tagged player(s)"):format(tagged)
