@@ -244,11 +244,23 @@ end
 
 local function toggle(page, title, detail, initial, callback)
     local enabled = initial == true
-    local button = action(page, title, detail, function()
-        enabled = not enabled
-        callback(enabled)
-        notify(title .. (enabled and " activado" or " desactivado"), enabled and COLORS.success or COLORS.muted)
-    end)
+    local button = make("TextButton", {
+        Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = COLORS.panel2,
+        BorderSizePixel = 0, Text = "", AutoButtonColor = true,
+    }, page)
+    corner(button, 9)
+    make("TextLabel", {
+        BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 7),
+        Size = UDim2.new(1, -76, 0, 18), Font = Enum.Font.GothamMedium,
+        Text = title, TextColor3 = COLORS.text, TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, button)
+    make("TextLabel", {
+        BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 26),
+        Size = UDim2.new(1, -76, 0, 16), Font = Enum.Font.Gotham,
+        Text = detail or "", TextColor3 = COLORS.muted, TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, button)
     local pill = make("TextLabel", {
         AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
         Size = UDim2.fromOffset(42, 22), BackgroundColor3 = enabled and COLORS.violet or COLORS.background,
@@ -256,18 +268,18 @@ local function toggle(page, title, detail, initial, callback)
         Font = Enum.Font.GothamBold, TextSize = 10,
     }, button)
     corner(pill, 7)
-    local originalCallback = callback
-    button.Activated:Connect(function()
-        enabled = not enabled
-        pill.Text = enabled and "ON" or "OFF"
-        pill.BackgroundColor3 = enabled and COLORS.violet or COLORS.background
-    end)
-    return function(value)
+    local function setEnabled(value, shouldNotify)
         enabled = value
         pill.Text = enabled and "ON" or "OFF"
         pill.BackgroundColor3 = enabled and COLORS.violet or COLORS.background
-        originalCallback(enabled)
+        callback(enabled)
+        if shouldNotify then
+            notify(title .. (enabled and " activado" or " desactivado"), enabled and COLORS.success or COLORS.muted)
+        end
     end
+    button.Activated:Connect(function() setEnabled(not enabled, true) end)
+    callback(enabled)
+    return setEnabled
 end
 
 addTab("Home", "⌂")
