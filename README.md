@@ -33,3 +33,14 @@ The server script is **Studio-only by default** and validates action names and v
 The supplied `Vortex X Sage [MM2]` script was incomplete at its final Night Mode block and relies on executor APIs that are not standard Studio APIs. This project recreates useful UI and developer testing features without copying executor-only remote abuse, silent aim, kill aura, forced touch interactions, or public-game farming.
 
 See [source audit](docs/ORIGINAL_SOURCE_AUDIT.md).
+
+
+## Role ESP test integration (Studio)
+
+The Roles tab now includes a player roster. In a Studio test session, choose Murderer, Sheriff, or Innocent beside a player; the server sets that player's `StarfallTestRole` attribute, which replicates to clients. Enable **Role ESP** to show the colored outline and label. Use **Clear role** to remove a test tag and **Refresh player roster** after the test roster changes.
+
+Install both scripts:
+1. `Starfall.client.lua` as a **LocalScript** in `StarterPlayer > StarterPlayerScripts`.
+2. `StarfallServer.server.lua` as a **Script** in `ServerScriptService`.
+
+The server script is Studio-only by default (`STUDIO_ONLY = true`). This role roster is a test harness; it does not read the decompiled game's hidden round roles or alter the game's round manager. Do not turn off the Studio restriction for a public experience without adding a secure developer allowlist and reviewing every server action.
