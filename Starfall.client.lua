@@ -316,7 +316,7 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 local visuals = pages.Visuals
-heading(visuals, "Visual diagnostics", "Client-side diagnostics for testing your own place.")
+heading(visuals, "Visual lab", "Local visual tests and character diagnostics.")
 action(visuals, "Inspect local character", "Prints the character and Humanoid state to Output.", function()
     local char = player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -327,6 +327,26 @@ end)
 action(visuals, "Refresh diagnostics", "Reports player count and current camera.", function()
     print(("[Starfall] Players: %d | Camera: %s"):format(#Players:GetPlayers(), tostring(workspace.CurrentCamera)))
     notify("Diagnóstico actualizado.", COLORS.success)
+end)
+action(visuals, "Preview: highlight my character", "Adds a temporary violet outline to your own avatar.", function()
+    local char = player.Character
+    if not char then notify("Tu personaje aún no está listo.", COLORS.danger) return end
+    local existing = gui:FindFirstChild("StarfallVisualPreview")
+    if existing then existing:Destroy() end
+    local h = Instance.new("Highlight")
+    h.Name = "StarfallVisualPreview"
+    h.Adornee = char
+    h.FillColor = COLORS.violet
+    h.OutlineColor = COLORS.blue
+    h.FillTransparency = 0.8
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Parent = gui
+    notify("Vista previa visual activada.", COLORS.success)
+end)
+action(visuals, "Clear visual preview", "Removes the temporary character outline.", function()
+    local existing = gui:FindFirstChild("StarfallVisualPreview")
+    if existing then existing:Destroy() end
+    notify("Vista previa eliminada.", COLORS.success)
 end)
 
 local environment = pages.Environment
@@ -462,14 +482,39 @@ local function requestTest(actionName, value)
 end
 
 local roles = pages.Roles
-heading(roles, "Role testing", "Only changes test attributes used by your own game. Wire these into your round system.")
+heading(roles, "Role preview", "Client preview works without a server script. It only tags your local character.")
+local rolePreviewColors = {
+    Murderer = COLORS.danger,
+    Sheriff = COLORS.blue,
+    Innocent = COLORS.success,
+}
+local rolePreviewStatus = make("TextLabel", {
+    BackgroundColor3 = COLORS.panel2, Size = UDim2.new(1, 0, 0, 38),
+    Font = Enum.Font.GothamMedium, Text = "PREVIEW ROLE: NONE",
+    TextColor3 = COLORS.muted, TextSize = 11,
+}, roles)
+corner(rolePreviewStatus, 9)
+local function setLocalRolePreview(roleName)
+    player:SetAttribute("StarfallTestRole", roleName)
+    rolePreviewStatus.Text = "PREVIEW ROLE: " .. string.upper(roleName)
+    rolePreviewStatus.TextColor3 = rolePreviewColors[roleName]
+    notify("Vista previa de rol: " .. roleName, rolePreviewColors[roleName])
+end
 for _, roleName in ipairs({"Murderer", "Sheriff", "Innocent"}) do
-    action(roles, "Set my test role: " .. roleName, "Server-validated; stores StarfallTestRole on your player.", function()
-        requestTest("SetTestRole", roleName)
+    action(roles, "Preview role: " .. roleName, "Applies a local visual tag for ESP testing.", function()
+        setLocalRolePreview(roleName)
+        refreshRoleHighlights()
     end)
 end
-action(roles, "Clear test role", "Removes the Starfall test-role attribute.", function()
-    requestTest("ClearTestRole")
+action(roles, "Clear preview role", "Removes the local preview tag.", function()
+    player:SetAttribute("StarfallTestRole", nil)
+    rolePreviewStatus.Text = "PREVIEW ROLE: NONE"
+    rolePreviewStatus.TextColor3 = COLORS.muted
+    refreshRoleHighlights()
+    notify("Vista previa de rol eliminada.", COLORS.success)
+end)
+action(roles, "Apply role on server (Studio only)", "Requires StarfallServer.server.lua in ServerScriptService.", function()
+    requestTest("SetTestRole", player:GetAttribute("StarfallTestRole"))
 end)
 
 local round = pages.Round
@@ -538,7 +583,7 @@ local function refreshRoleHighlights()
     end
     local tagged = 0
     for _, target in ipairs(Players:GetPlayers()) do
-        if target ~= player then
+        if true then
             local role = target:GetAttribute("StarfallTestRole")
             local char = target.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
