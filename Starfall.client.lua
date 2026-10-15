@@ -141,10 +141,12 @@ local close = make("TextButton", {
 }, top)
 corner(close, 8)
 
-local sidebar = make("Frame", {
+local sidebar = make("ScrollingFrame", {
     Name = "Sidebar", Position = UDim2.fromOffset(14, 78),
     Size = UDim2.new(0, 150, 1, -94), BackgroundColor3 = COLORS.panel,
-    BorderSizePixel = 0,
+    BorderSizePixel = 0, ScrollBarThickness = 3,
+    ScrollBarImageColor3 = COLORS.violet, CanvasSize = UDim2.new(),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y,
 }, main)
 corner(sidebar, 10)
 make("UIPadding", {
@@ -501,51 +503,110 @@ action(playerTest, "Give test gun", "Clones ServerStorage > StarfallTestTools > 
 end)
 
 local espPage = pages.ESP
-heading(espPage, "Role ESP", "Highlights only players with StarfallTestRole attributes in your own test experience.")
+heading(espPage, "Role ESP", "Role labels, distance and outlines for players tagged by your own server.")
 local espEnabled = false
-local highlights = {}
-local function clearRoleHighlights()
-    for playerTarget, highlight in pairs(highlights) do
-        if highlight and highlight.Parent then highlight:Destroy() end
-        highlights[playerTarget] = nil
+local highlights, labels = {}, {}
+local roleColors = {
+    Murderer = COLORS.danger,
+    Sheriff = COLORS.blue,
+    Innocent = COLORS.success,
+}
+local espStatus = make("TextLabel", {
+    BackgroundColor3 = COLORS.panel2, Size = UDim2.new(1, 0, 0, 38),
+    Font = Enum.Font.GothamMedium, Text = "ESP OFF  •  waiting for role tags",
+    TextColor3 = COLORS.muted, TextSize = 11, TextWrapped = true,
+}, espPage)
+corner(espStatus, 9)
+
+local function clearRoleESP()
+    for target, item in pairs(highlights) do
+        if item and item.Parent then item:Destroy() end
+        highlights[target] = nil
+    end
+    for target, item in pairs(labels) do
+        if item and item.Parent then item:Destroy() end
+        labels[target] = nil
     end
 end
+
 local function refreshRoleHighlights()
-    clearRoleHighlights()
-    if not espEnabled then return end
+    clearRoleESP()
+    if not espEnabled then
+        espStatus.Text = "ESP OFF"
+        espStatus.TextColor3 = COLORS.muted
+        return
+    end
+    local tagged = 0
     for _, target in ipairs(Players:GetPlayers()) do
-        if target ~= player and target:GetAttribute("StarfallTestRole") then
+        if target ~= player then
+            local role = target:GetAttribute("StarfallTestRole")
             local char = target.Character
-            if char then
-                local role = target:GetAttribute("StarfallTestRole")
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local color = roleColors[role]
+            if color and char and root then
+                tagged += 1
                 local h = Instance.new("Highlight")
-                h.Name = "StarfallTestRoleHighlight"
+                h.Name = "StarfallRoleHighlight"
                 h.Adornee = char
                 h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                h.FillTransparency = 0.55
-                h.OutlineTransparency = 0
-                h.FillColor = role == "Murderer" and COLORS.danger or (role == "Sheriff" and COLORS.blue or COLORS.success)
-                h.OutlineColor = h.FillColor
+                h.FillTransparency = 0.72
+                h.OutlineTransparency = 0.05
+                h.FillColor, h.OutlineColor = color, color
                 h.Parent = gui
                 highlights[target] = h
+
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "StarfallRoleLabel"
+                billboard.Adornee = root
+                billboard.AlwaysOnTop = true
+                billboard.Size = UDim2.fromOffset(180, 44)
+                billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+                billboard.MaxDistance = 1200
+                billboard.Parent = gui
+
+                local text = Instance.new("TextLabel")
+                text.BackgroundTransparency = 1
+                text.Size = UDim2.fromScale(1, 1)
+                text.Font = Enum.Font.GothamBold
+                text.TextSize = 12
+                text.TextStrokeTransparency = 0.25
+                text.TextColor3 = color
+                text.Text = string.upper(role) .. "  •  " .. target.DisplayName
+                text.Parent = billboard
+                labels[target] = billboard
             end
         end
     end
+    espStatus.Text = ("ESP ON  •  %d tagged player(s)"):format(tagged)
+    espStatus.TextColor3 = tagged > 0 and COLORS.success or COLORS.muted
 end
-toggle(espPage, "Enable role highlights", "Only reads StarfallTestRole attributes.", false, function(value)
+
+toggle(espPage, "Enable role ESP", "Outline + role name + display name for tagged test players.", false, function(value)
     espEnabled = value
     refreshRoleHighlights()
 end)
-Players.PlayerAdded:Connect(function(p)
-    p:GetAttributeChangedSignal("StarfallTestRole"):Connect(refreshRoleHighlights)
-    p.CharacterAdded:Connect(refreshRoleHighlights)
+action(espPage, "Refresh role ESP", "Rechecks character and role attributes now.", refreshRoleHighlights)
+action(espPage, "Clear ESP tags (test)", "Clears only this client's visual overlays.", function()
+    clearRoleESP()
+    espEnabled = false
+    espStatus.Text = "ESP cleared"
+    espStatus.TextColor3 = COLORS.muted
+    notify("Visual overlays cleared.", COLORS.success)
 end)
-for _, p in ipairs(Players:GetPlayers()) do
+
+local function watchPlayer(p)
     p:GetAttributeChangedSignal("StarfallTestRole"):Connect(refreshRoleHighlights)
-    p.CharacterAdded:Connect(refreshRoleHighlights)
+    p.CharacterAdded:Connect(function()
+        task.wait(0.25)
+        refreshRoleHighlights()
+    end)
 end
+Players.PlayerAdded:Connect(watchPlayer)
+for _, p in ipairs(Players:GetPlayers()) do watchPlayer(p) end
 Players.PlayerRemoving:Connect(function(p)
     if highlights[p] then highlights[p]:Destroy(); highlights[p] = nil end
+    if labels[p] then labels[p]:Destroy(); labels[p] = nil end
+    task.defer(refreshRoleHighlights)
 end)
 
 
