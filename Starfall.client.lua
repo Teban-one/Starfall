@@ -187,21 +187,48 @@ local function selectTab(name)
     currentTab = name
     for tabName, page in pairs(pages) do page.Visible = tabName == name end
     for tabName, button in pairs(tabButtons) do
-        button.BackgroundColor3 = tabName == name and COLORS.panel2 or COLORS.panel
-        button.TextColor3 = tabName == name and COLORS.text or COLORS.muted
+        local selected = tabName == name
+        if tabName == "Visuals" then
+            button.BackgroundColor3 = selected and Color3.fromRGB(53, 61, 116) or Color3.fromRGB(38, 43, 83)
+            button.TextColor3 = COLORS.text
+        else
+            button.BackgroundColor3 = selected and COLORS.panel2 or COLORS.panel
+            button.TextColor3 = selected and COLORS.text or COLORS.muted
+        end
     end
     content.CanvasPosition = Vector2.zero
 end
 
+local function addSectionLabel(text)
+    make("TextLabel", {
+        Name = text:gsub("%W", "") .. "Section",
+        BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 20),
+        Font = Enum.Font.GothamBold, Text = text, TextColor3 = COLORS.muted,
+        TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left,
+    }, sidebar)
+end
+
 local function addTab(name, icon)
+    local isVisuals = name == "Visuals"
     local button = make("TextButton", {
-        Name = name .. "Tab", Size = UDim2.new(1, 0, 0, 36),
-        BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
-        Text = "  " .. icon .. "   " .. name, TextColor3 = COLORS.muted,
-        TextSize = 12, Font = Enum.Font.GothamMedium,
+        Name = name .. "Tab", Size = UDim2.new(1, 0, 0, isVisuals and 42 or 36),
+        BackgroundColor3 = isVisuals and Color3.fromRGB(38, 43, 83) or COLORS.panel,
+        BorderSizePixel = 0,
+        Text = (isVisuals and "  ✦  " or "  ") .. icon .. "   " .. name,
+        TextColor3 = isVisuals and COLORS.text or COLORS.muted,
+        TextSize = isVisuals and 13 or 12,
+        Font = isVisuals and Enum.Font.GothamBold or Enum.Font.GothamMedium,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, sidebar)
     corner(button, 8)
+    if isVisuals then
+        stroke(button, COLORS.violet, 0.15)
+        make("Frame", {
+            Name = "VisualsAccent", Position = UDim2.new(0, 0, 0, 5),
+            Size = UDim2.new(0, 3, 1, -10), BackgroundColor3 = COLORS.violet,
+            BorderSizePixel = 0,
+        }, button)
+    end
     tabButtons[name] = button
     createPage(name)
     button.Activated:Connect(function() selectTab(name) end)
@@ -285,13 +312,16 @@ local function toggle(page, title, detail, initial, callback)
 end
 
 addTab("Home", "⌂")
+addSectionLabel("APPEARANCE")
 addTab("Visuals", "◈")
 addTab("Environment", "☾")
+addSectionLabel("TEST TOOLS")
 addTab("Movement", "➤")
 addTab("Settings", "⚙")
 addTab("Roles", "♜")
 addTab("Round", "◷")
 addTab("Player Test", "✦")
+addSectionLabel("DEBUG OVERLAYS")
 addTab("ESP", "◎")
 
 local home = pages.Home
@@ -316,7 +346,59 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 local visuals = pages.Visuals
-heading(visuals, "Visual lab", "Local visual tests and character diagnostics.")
+local visualHero = make("Frame", {
+    Name = "VisualsHero", Size = UDim2.new(1, 0, 0, 94),
+    BackgroundColor3 = Color3.fromRGB(36, 39, 79), BorderSizePixel = 0,
+}, visuals)
+corner(visualHero, 12)
+stroke(visualHero, COLORS.violet, 0.15)
+make("TextLabel", {
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 12),
+    Size = UDim2.new(1, -28, 0, 26), Font = Enum.Font.GothamBold,
+    Text = "◈  VISUALS  /  APPEARANCE", TextColor3 = COLORS.text,
+    TextSize = 17, TextXAlignment = Enum.TextXAlignment.Left,
+}, visualHero)
+make("TextLabel", {
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 42),
+    Size = UDim2.new(1, -28, 0, 38), Font = Enum.Font.Gotham,
+    Text = "ONLY visual settings live here: previews, highlights and on-screen labels. Gameplay tests are in the other tabs.",
+    TextColor3 = Color3.fromRGB(202, 207, 238), TextSize = 11,
+    TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+}, visualHero)
+heading(visuals, "Appearance & diagnostics", "Local-only previews for your own Studio test experience.")
+local roleLegend = make("Frame", {
+    Name = "RoleColorLegend", BackgroundColor3 = COLORS.panel2,
+    BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 52),
+}, visuals)
+corner(roleLegend, 9)
+make("TextLabel", {
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 5),
+    Size = UDim2.new(1, -20, 0, 15), Font = Enum.Font.GothamBold,
+    Text = "TEST ROLE COLOR KEY", TextColor3 = COLORS.muted, TextSize = 9,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, roleLegend)
+for index, entry in ipairs({
+    {name = "Murderer", color = COLORS.danger},
+    {name = "Sheriff", color = COLORS.blue},
+    {name = "Innocent", color = COLORS.success},
+}) do
+    local chip = make("Frame", {
+        Position = UDim2.new((index - 1) / 3, 10, 0, 25),
+        Size = UDim2.new(1 / 3, -14, 0, 19),
+        BackgroundColor3 = entry.color, BorderSizePixel = 0,
+    }, roleLegend)
+    corner(chip, 5)
+    make("TextLabel", {
+        BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1),
+        Font = Enum.Font.GothamBold, Text = entry.name,
+        TextColor3 = Color3.new(1, 1, 1), TextSize = 9,
+    }, chip)
+end
+action(visuals, "Open Role ESP settings →", "Role outlines and labels are grouped in the ESP tab under Debug Overlays.", function()
+    selectTab("ESP")
+    notify("Role ESP is under DEBUG OVERLAYS.", COLORS.violet)
+end)
 action(visuals, "Inspect local character", "Prints the character and Humanoid state to Output.", function()
     local char = player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -481,8 +563,9 @@ local function requestTest(actionName, value)
     return allowed
 end
 
+local refreshRoleHighlights
 local roles = pages.Roles
-heading(roles, "Role preview", "Client preview works without a server script. It only tags your local character.")
+heading(roles, "Role preview", "TEST TOOLS: assign preview attributes here. Appearance controls are in Visuals; role overlays are in ESP.")
 local rolePreviewColors = {
     Murderer = COLORS.danger,
     Sheriff = COLORS.blue,
@@ -602,7 +685,16 @@ action(playerTest, "Give test gun", "Clones ServerStorage > StarfallTestTools > 
 end)
 
 local espPage = pages.ESP
-heading(espPage, "Role ESP", "Role labels, distance and outlines for players tagged by your own server.")
+heading(espPage, "Debug overlays / Role ESP", "TEST VISUAL OVERLAY ONLY. Uses StarfallTestRole tags from your own Studio test setup.")
+local espNotice = make("TextLabel", {
+    BackgroundColor3 = Color3.fromRGB(47, 34, 60),
+    Size = UDim2.new(1, 0, 0, 44), Font = Enum.Font.GothamMedium,
+    Text = "⚠  ROLE ESP IS A DEBUG OVERLAY",
+    TextColor3 = Color3.fromRGB(255, 205, 220), TextSize = 11,
+    TextWrapped = true,
+}, espPage)
+corner(espNotice, 9)
+stroke(espNotice, COLORS.danger, 0.35)
 local espEnabled = false
 local highlights, labels = {}, {}
 local roleColors = {
@@ -628,7 +720,7 @@ local function clearRoleESP()
     end
 end
 
-local function refreshRoleHighlights()
+refreshRoleHighlights = function()
     clearRoleESP()
     if not espEnabled then
         espStatus.Text = "ESP OFF"
