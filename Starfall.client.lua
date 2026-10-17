@@ -685,11 +685,11 @@ action(playerTest, "Give test gun", "Clones ServerStorage > StarfallTestTools > 
 end)
 
 local espPage = pages.ESP
-heading(espPage, "Debug overlays / Role ESP", "TEST VISUAL OVERLAY ONLY. Uses StarfallTestRole tags from your own Studio test setup.")
+heading(espPage, "Automatic Role ESP", "Detects Murderer, Sheriff and Innocent from CurrentRoundClient.PlayerData when the server provides those roles. StarfallTestRole remains available as a test fallback.")
 local espNotice = make("TextLabel", {
     BackgroundColor3 = Color3.fromRGB(47, 34, 60),
     Size = UDim2.new(1, 0, 0, 44), Font = Enum.Font.GothamMedium,
-    Text = "⚠  ROLE ESP IS A DEBUG OVERLAY",
+    Text = "ROLE SOURCE: CurrentRoundClient.PlayerData → Role",
     TextColor3 = Color3.fromRGB(255, 205, 220), TextSize = 11,
     TextWrapped = true,
 }, espPage)
@@ -704,10 +704,66 @@ local roleColors = {
 }
 local espStatus = make("TextLabel", {
     BackgroundColor3 = COLORS.panel2, Size = UDim2.new(1, 0, 0, 38),
-    Font = Enum.Font.GothamMedium, Text = "ESP OFF  •  waiting for role tags",
+    Font = Enum.Font.GothamMedium, Text = "ESP OFF  •  waiting for round data",
     TextColor3 = COLORS.muted, TextSize = 11, TextWrapped = true,
 }, espPage)
 corner(espStatus, 9)
+
+-- Automatic role source. CurrentRoundClient is the game's client module; it can only
+-- show roles actually returned to this client by the server.
+local currentRoundClient
+local roundPlayerData = {}
+do
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local moduleScript = modules and modules:FindFirstChild("CurrentRoundClient")
+    if moduleScript and moduleScript:IsA("ModuleScript") then
+        local ok, result = pcall(require, moduleScript)
+        if ok and type(result) == "table" then
+            currentRoundClient = result
+            if type(result.PlayerData) == "table" then
+                roundPlayerData = result.PlayerData
+            end
+        else
+            warn("[Starfall] Could not load CurrentRoundClient:", result)
+        end
+    end
+end
+
+local function refreshRoundPlayerData()
+    if currentRoundClient then
+        local ok, latest = pcall(function()
+            return currentRoundClient.GetLatestPlayerData()
+        end)
+        if ok and type(latest) == "table" then
+            roundPlayerData = latest
+        elseif type(currentRoundClient.PlayerData) == "table" then
+            roundPlayerData = currentRoundClient.PlayerData
+        end
+    end
+end
+
+local function getRoleForPlayer(target)
+    -- Explicit test tags take precedence for local Studio testing.
+    local testRole = target:GetAttribute("StarfallTestRole")
+    if roleColors[testRole] then return testRole end
+
+    -- PlayerData is commonly keyed by player name in this game's spectator modules.
+    local entry = roundPlayerData[target.Name]
+    if type(entry) == "table" and roleColors[entry.Role] then
+        return entry.Role
+    end
+
+    -- Some game versions may return an array of player records instead.
+    for key, value in pairs(roundPlayerData) do
+        if type(value) == "table" and roleColors[value.Role] then
+            local recordName = value.Name or value.PlayerName or value.Username
+            if recordName == target.Name or key == target.Name then
+                return value.Role
+            end
+        end
+    end
+    return nil
+end
 
 local function clearRoleESP()
     for target, item in pairs(highlights) do
@@ -729,7 +785,7 @@ refreshRoleHighlights = function()
     end
     local tagged = 0
     for _, target in ipairs(Players:GetPlayers()) do
-        local role = target:GetAttribute("StarfallTestRole")
+        local role = getRoleForPlayer(target)
         local char = target.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local color = roleColors[role]
@@ -766,7 +822,7 @@ refreshRoleHighlights = function()
                 labels[target] = billboard
         end
     end
-    espStatus.Text = ("ESP ON  •  %d tagged player(s)"):format(tagged)
+    espStatus.Text = ("ESP ON  •  %d role(s) detected"):format(tagged)
     espStatus.TextColor3 = tagged > 0 and COLORS.success or COLORS.muted
 end
 
@@ -790,6 +846,28 @@ local function watchPlayer(p)
         refreshRoleHighlights()
     end)
 end
+
+-- Refresh when the game's round-data module signals changes.
+if currentRoundClient and currentRoundClient.PlayerDataChanged then
+    pcall(function()
+        currentRoundClient.PlayerDataChanged.Event:Connect(function()
+            task.defer(function()
+                if type(currentRoundClient.PlayerData) == "table" then
+                    roundPlayerData = currentRoundClient.PlayerData
+                else
+                    refreshRoundPlayerData()
+                end
+                refreshRoleHighlights()
+            end)
+        end)
+    end)
+end
+
+-- Fetch the latest snapshot once at startup; no repeated polling.
+task.spawn(function()
+    refreshRoundPlayerData()
+    refreshRoleHighlights()
+end)
 Players.PlayerAdded:Connect(watchPlayer)
 for _, p in ipairs(Players:GetPlayers()) do watchPlayer(p) end
 Players.PlayerRemoving:Connect(function(p)
