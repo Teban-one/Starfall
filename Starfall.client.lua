@@ -74,6 +74,7 @@ local main = make("Frame", {
 }, gui)
 corner(main, 14)
 outline(main, C.violet, 0.15)
+local mainScale = make("UIScale", {Scale = 1}, main)
 
 local top = make("Frame", {
     Name = "TopBar", Size = UDim2.new(1, 0, 0, 62),
@@ -86,7 +87,7 @@ make("UIGradient", {Color = ColorSequence.new(C.blue, C.violet)}, accent)
 label(top, "✦  STARFALL", UDim2.fromOffset(16, 8), UDim2.new(1, -110, 0, 28), 19, C.text, Enum.Font.GothamBold)
 label(top, "CONTROL CENTER  •  K TO TOGGLE", UDim2.fromOffset(18, 35), UDim2.new(1, -120, 0, 15), 9, C.muted)
 local hideButton = button(top, "—", UDim2.new(1, -48, 0, 15), UDim2.fromOffset(32, 30), function()
-    setPanelVisible(false)
+    main.Visible = false
 end, C.panel2)
 hideButton.TextSize = 18
 
@@ -100,8 +101,16 @@ outline(reopen, C.violet, 0.1)
 reopen.Visible = false
 
 local function setPanelVisible(value)
-    main.Visible = value
     reopen.Visible = not value
+    if value then
+        main.Visible = true
+        mainScale.Scale = 0.94
+        TweenService:Create(mainScale, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Scale = 1
+        }):Play()
+    else
+        main.Visible = false
+    end
 end
 hideButton.Activated:Connect(function() setPanelVisible(false) end)
 reopen.Activated:Connect(function() setPanelVisible(true) end)
