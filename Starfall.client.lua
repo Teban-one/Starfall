@@ -323,6 +323,7 @@ end)
 sectionTitle("03  /  NIGHT TEXTURE")
 infoCard("Nightfall visual preset", "Dark blue night atmosphere, cool ambient light and subtle fog. Local visual effect.", 44)
 local nightOn = false
+local nightToggle
 local oldLighting = {}
 local atmosphere, colorCorrection
 local function setNight(value)
