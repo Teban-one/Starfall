@@ -1,7 +1,7 @@
 --[[
     STARFALL | ESP EDITION
     For your own Roblox experience / Studio test place.
-    RightShift toggles the panel. Hide button leaves a small reopen button.
+    K toggles the panel. Hidden panel becomes a movable floating button.
 ]]
 
 local Players = game:GetService("Players")
@@ -106,8 +106,26 @@ end
 hideButton.Activated:Connect(function() setPanelVisible(false) end)
 reopen.Activated:Connect(function() setPanelVisible(true) end)
 UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+    if not processed and input.KeyCode == Enum.KeyCode.K then
         setPanelVisible(not main.Visible)
+    end
+end)
+
+local miniDragging, miniDragStart, miniStartPos
+reopen.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        miniDragging, miniDragStart, miniStartPos = true, input.Position, reopen.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if miniDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - miniDragStart
+        reopen.Position = UDim2.new(miniStartPos.X.Scale, miniStartPos.X.Offset + delta.X, miniStartPos.Y.Scale, miniStartPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        miniDragging = false
     end
 end)
 
@@ -128,19 +146,28 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
 end)
 
-local body = make("Frame", {
+local body = make("ScrollingFrame", {
     Name = "Controls", Position = UDim2.fromOffset(14, 76),
-    Size = UDim2.new(1, -28, 1, -90), BackgroundTransparency = 1,
+    Size = UDim2.new(1, -28, 1, -104), BackgroundTransparency = 1,
+    BorderSizePixel = 0, ScrollBarThickness = 4,
+    ScrollBarImageColor3 = C.violet, AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    CanvasSize = UDim2.new(0, 0, 0, 0), ScrollingDirection = Enum.ScrollingDirection.Y,
 }, main)
 make("UIListLayout", {Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder}, body)
 
+local nextLayoutOrder = 1
+local function ordered(obj)
+    obj.LayoutOrder = nextLayoutOrder
+    nextLayoutOrder += 1
+    return obj
+end
 local function sectionTitle(text)
-    local f = make("Frame", {Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = C.panel, BorderSizePixel = 0}, body)
+    local f = ordered(make("Frame", {Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = C.panel, BorderSizePixel = 0}, body))
     corner(f, 7)
     label(f, text, UDim2.fromOffset(10, 0), UDim2.new(1, -20, 1, 0), 11, C.violet, Enum.Font.GothamBold)
 end
 local function infoCard(title, description, height)
-    local f = make("Frame", {Size = UDim2.new(1, 0, 0, height or 54), BackgroundColor3 = C.panel, BorderSizePixel = 0}, body)
+    local f = ordered(make("Frame", {Size = UDim2.new(1, 0, 0, height or 54), BackgroundColor3 = C.panel, BorderSizePixel = 0}, body))
     corner(f, 8)
     label(f, title, UDim2.fromOffset(11, 6), UDim2.new(1, -22, 0, 18), 12, C.text, Enum.Font.GothamBold)
     label(f, description, UDim2.fromOffset(11, 25), UDim2.new(1, -22, 1, -29), 10, C.muted)
@@ -150,6 +177,7 @@ end
 sectionTitle("01  /  ROLE ESP")
 infoCard("Automatic role labels", "Murderer = red  •  Sheriff = blue  •  Innocent = green", 44)
 local espStatus = infoCard("ESP: OFF", "Waiting for round data.", 46)
+local espStatusTitle = espStatus:FindFirstChildWhichIsA("TextLabel")
 local espEnabled = false
 local roleColors = {Murderer = C.red, Sheriff = C.blue, Innocent = C.green}
 local highlights, labels = {}, {}
@@ -204,7 +232,7 @@ end
 local function updateESP()
     clearESP()
     if not espEnabled then
-        espStatus:FindFirstChildWhichIsA("TextLabel").Text = "ESP: OFF"
+        espStatusTitle.Text = "ESP: OFF"
         return
     end
     local count = 0
@@ -241,7 +269,7 @@ local function updateESP()
             labels[target] = bb
         end
     end
-    espStatus:FindFirstChildWhichIsA("TextLabel").Text = ("ESP: ON  •  %d players detected"):format(count)
+    espStatusTitle.Text = ("ESP: ON  •  %d players detected"):format(count)
 end
 
 local espToggle
@@ -254,12 +282,13 @@ end
 espToggle = button(body, "ESP  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 38), function()
     setESP(not espEnabled)
 end)
-espToggle.LayoutOrder = 10
+ordered(espToggle)
 
-button(body, "↻  Refresh roles now", UDim2.new(), UDim2.new(1, 0, 0, 34), function()
+local refreshButton = button(body, "↻  Refresh roles now", UDim2.new(), UDim2.new(1, 0, 0, 34), function()
     refreshRoundData()
     updateESP()
-end, C.panel2).LayoutOrder = 11
+end, C.panel2)
+ordered(refreshButton)
 
 if currentRoundClient and currentRoundClient.PlayerDataChanged then
     pcall(function()
@@ -311,7 +340,7 @@ end
 speedToggle = button(body, "RUN SPEED  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
     setSpeed(not speedOn)
 end, C.panel2)
-speedToggle.LayoutOrder = 20
+ordered(speedToggle)
 player.CharacterAdded:Connect(function(char)
     task.wait(0.4)
     if speedOn then
@@ -372,7 +401,7 @@ end
 nightToggle = button(body, "NIGHT TEXTURE  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
     setNight(not nightOn)
 end, C.panel2)
-nightToggle.LayoutOrder = 30
+ordered(nightToggle)
 
 -- Restore local modifications when the UI is destroyed.
 gui.Destroying:Connect(function()
@@ -381,5 +410,4 @@ gui.Destroying:Connect(function()
     clearESP()
 end)
 
-label(main, "RightShift: hide/show  •  — : hide to floating button", UDim2.new(0, 16, 1, -20), UDim2.new(1, -32, 0, 14), 9, C.muted)
-notify = function(message) print("[Starfall] " .. tostring(message)) end
+label(main, "K: open/close  •  drag ✦ to move it", UDim2.new(0, 16, 1, -20), UDim2.new(1, -32, 0, 14), 9, C.muted)
