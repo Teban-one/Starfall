@@ -172,7 +172,7 @@ local pageHost = make("Frame", {
     Size = UDim2.new(1, -154, 1, 0), BackgroundTransparency = 1,
     ClipsDescendants = true,
 }, workspace)
-local pageNames = {"Home", "Visual", "Perks", "Whitelist", "Teleport", "Misc"}
+local pageNames = {"Home", "Visual", "Perks", "Whitelist", "Teleport", "Other"}
 local pages, navButtons = {}, {}
 local activePageName = "Home"
 local activePage
@@ -248,8 +248,9 @@ local function infoCard(title, description, height)
     return f
 end
 
-pageHeader("Visual", "Role ESP and player indicators")
 activePage = pages.Visual
+nextLayoutOrder = 1
+pageHeader("Visual", "Role ESP and player indicators")
 nextLayoutOrder = 1
 sectionTitle("ROLE ESP")
 infoCard("Automatic role labels", "Murderer = red  •  Sheriff = blue  •  Innocent = green", 44)
@@ -394,8 +395,9 @@ Players.PlayerRemoving:Connect(function(p)
     task.defer(updateESP)
 end)
 
-pageHeader("Misc", "Small quality-of-life options")
-activePage = pages.Misc
+activePage = pages.Other
+nextLayoutOrder = 1
+pageHeader("Other", "Small quality-of-life options")
 nextLayoutOrder = 1
 sectionTitle("MOVEMENT")
 infoCard("Slightly faster", "Local test speed: 20 WalkSpeed. Toggle off to restore your original speed.", 44)
@@ -483,6 +485,17 @@ nightToggle = button(activePage, "NIGHT TEXTURE  •  OFF", UDim2.new(), UDim2.n
 end, C.panel2)
 ordered(nightToggle)
 
+sectionTitle("ANTI FLYING")
+infoCard("Anti-flying protection", "UI placeholder only. Reliable protection against body-fling attacks must be implemented and validated by your game's server.", 66)
+local antiFlyingEnabled = false
+local antiFlyingButton = button(activePage, "ANTI FLYING  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
+    antiFlyingEnabled = not antiFlyingEnabled
+    antiFlyingButton.Text = antiFlyingEnabled and "ANTI FLYING  •  PLACEHOLDER ON" or "ANTI FLYING  •  NOT CONFIGURED"
+    antiFlyingButton.BackgroundColor3 = antiFlyingEnabled and C.blue or C.panel2
+    print("[Starfall] Anti-flying is a UI placeholder; server protection is not active.")
+end, C.panel2)
+ordered(antiFlyingButton)
+
 -- Restore local modifications when the UI is destroyed.
 gui.Destroying:Connect(function()
     if speedOn then setSpeed(false) end
@@ -496,16 +509,21 @@ nextLayoutOrder = 1
 pageHeader("Welcome to Starfall", "Your control center at a glance")
 infoCard("Session", "Player: " .. player.DisplayName .. "  •  Username: @" .. player.Name, 54)
 infoCard("Quick status", "Panel ready  •  Toggle key: K  •  Build: Starfall Control Center", 54)
-infoCard("Navigation", "Use the left menu to open Visual, Perks, Whitelist, Teleport and Misc.", 54)
+infoCard("Navigation", "Use the left menu to open Visual, Perks, Whitelist, Teleport and Other.", 54)
 
 activePage = pages.Perks
 nextLayoutOrder = 1
-pageHeader("Perks", "Admin-only tools will be added here")
-infoCard("Coming soon", "Reserved for server-authorized admin perks. Permission checks should be validated by the game server.", 68)
-local perksPlaceholder = button(activePage, "ADMIN PERKS  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
-    print("[Starfall] Admin perks are not configured yet.")
+pageHeader("Perks", "Admin-only tools")
+infoCard("Autoshoot", "Prototype entry added. Target selection, firing and permissions are not implemented; configure only for an experience you own or administer.", 72)
+local autoshootEnabled = false
+local autoshootButton = button(activePage, "AUTOSHOOT  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+    autoshootEnabled = not autoshootEnabled
+    autoshootButton.Text = autoshootEnabled and "AUTOSHOOT  •  PLACEHOLDER ON" or "AUTOSHOOT  •  NOT CONFIGURED"
+    autoshootButton.BackgroundColor3 = autoshootEnabled and C.violet or C.panel2
+    print("[Starfall] Autoshoot is a UI placeholder; no automatic firing is active.")
 end, C.panel2)
-ordered(perksPlaceholder)
+ordered(autoshootButton)
+infoCard("Admin permissions", "For a real admin perk, verify authorized UserIds on the server. A client toggle alone is not a security check.", 62)
 
 activePage = pages.Whitelist
 nextLayoutOrder = 1
