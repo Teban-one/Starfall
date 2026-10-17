@@ -1,5 +1,5 @@
 --[[
-    STARFALL | ESP EDITION
+    STARFALL | CONTROL CENTER
     For your own Roblox experience / Studio test place.
     K toggles the panel. Hidden panel becomes a movable floating button.
 ]]
@@ -68,8 +68,8 @@ local function button(parent, text, pos, size, callback, color)
 end
 
 local main = make("Frame", {
-    Name = "Main", Size = UDim2.fromOffset(430, 390),
-    Position = UDim2.new(0.5, -215, 0.5, -195),
+    Name = "Main", Size = UDim2.fromOffset(650, 455),
+    Position = UDim2.new(0.5, -325, 0.5, -227),
     BackgroundColor3 = C.bg, BorderSizePixel = 0,
 }, gui)
 corner(main, 14)
@@ -84,9 +84,9 @@ make("Frame", {Position = UDim2.new(0, 0, 1, -12), Size = UDim2.new(1, 0, 0, 12)
 local accent = make("Frame", {Position = UDim2.new(0, 0, 1, -2), Size = UDim2.new(1, 0, 0, 2), BorderSizePixel = 0, BackgroundColor3 = C.blue}, top)
 make("UIGradient", {Color = ColorSequence.new(C.blue, C.violet)}, accent)
 label(top, "✦  STARFALL", UDim2.fromOffset(16, 8), UDim2.new(1, -110, 0, 28), 19, C.text, Enum.Font.GothamBold)
-label(top, "ESP  •  SPEED  •  NIGHT", UDim2.fromOffset(18, 35), UDim2.new(1, -120, 0, 15), 9, C.muted)
+label(top, "CONTROL CENTER  •  K TO TOGGLE", UDim2.fromOffset(18, 35), UDim2.new(1, -120, 0, 15), 9, C.muted)
 local hideButton = button(top, "—", UDim2.new(1, -48, 0, 15), UDim2.fromOffset(32, 30), function()
-    main.Visible = false
+    setPanelVisible(false)
 end, C.panel2)
 hideButton.TextSize = 18
 
@@ -146,14 +146,79 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
 end)
 
-local body = make("ScrollingFrame", {
-    Name = "Controls", Position = UDim2.fromOffset(14, 76),
+-- Sidebar + animated page container.
+local workspace = make("Frame", {
+    Name = "Workspace", Position = UDim2.fromOffset(14, 76),
     Size = UDim2.new(1, -28, 1, -104), BackgroundTransparency = 1,
-    BorderSizePixel = 0, ScrollBarThickness = 4,
-    ScrollBarImageColor3 = C.violet, AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    CanvasSize = UDim2.new(0, 0, 0, 0), ScrollingDirection = Enum.ScrollingDirection.Y,
 }, main)
-make("UIListLayout", {Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder}, body)
+local sidebar = make("Frame", {
+    Name = "Sidebar", Size = UDim2.new(0, 142, 1, 0),
+    BackgroundColor3 = C.panel, BorderSizePixel = 0,
+}, workspace)
+corner(sidebar, 12)
+make("UIPadding", {PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8)}, sidebar)
+make("UIListLayout", {Padding = UDim.new(0, 7), SortOrder = Enum.SortOrder.LayoutOrder}, sidebar)
+local pageHost = make("Frame", {
+    Name = "PageHost", Position = UDim2.new(0, 154, 0, 0),
+    Size = UDim2.new(1, -154, 1, 0), BackgroundTransparency = 1,
+    ClipsDescendants = true,
+}, workspace)
+local pageNames = {"Home", "Visual", "Perks", "Whitelist", "Teleport", "Misc"}
+local pages, navButtons = {}, {}
+local activePageName = "Home"
+local activePage
+for _, pageName in ipairs(pageNames) do
+    local page = make("ScrollingFrame", {
+        Name = pageName .. "Page", Size = UDim2.fromScale(1, 1),
+        Position = UDim2.fromScale(0, 0), BackgroundTransparency = 1,
+        BorderSizePixel = 0, ScrollBarThickness = 4, ScrollBarImageColor3 = C.violet,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollingDirection = Enum.ScrollingDirection.Y, Visible = pageName == "Home",
+    }, pageHost)
+    make("UIPadding", {PaddingRight = UDim.new(0, 5), PaddingBottom = UDim.new(0, 8)}, page)
+    make("UIListLayout", {Padding = UDim.new(0, 9), SortOrder = Enum.SortOrder.LayoutOrder}, page)
+    pages[pageName] = page
+end
+activePage = pages.Home
+local function switchPage(name)
+    if not pages[name] or activePageName == name then return end
+    local previous = pages[activePageName]
+    local target = pages[name]
+    activePageName = name
+    activePage = target
+    target.Visible = true
+    target.Position = UDim2.new(0, 14, 0, 0)
+    target.BackgroundTransparency = 1
+    TweenService:Create(target, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 0, 0, 0)
+    }):Play()
+    if previous then
+        previous.Visible = false
+        previous.Position = UDim2.new(0, 0, 0, 0)
+    end
+    for pageName, nav in pairs(navButtons) do
+        local selected = pageName == name
+        TweenService:Create(nav, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = selected and C.violet or C.panel2,
+            TextColor3 = selected and Color3.new(1, 1, 1) or C.muted,
+        }):Play()
+    end
+end
+for i, pageName in ipairs(pageNames) do
+    local nav = button(sidebar, "  " .. pageName, UDim2.new(), UDim2.new(1, 0, 0, 36), function()
+        switchPage(pageName)
+    end, pageName == "Home" and C.violet or C.panel2)
+    nav.TextXAlignment = Enum.TextXAlignment.Left
+    nav.LayoutOrder = i
+    navButtons[pageName] = nav
+end
+local function pageHeader(titleText, subtitle)
+    local f = make("Frame", {Size = UDim2.new(1, -5, 0, 54), BackgroundColor3 = C.panel, BorderSizePixel = 0}, activePage)
+    corner(f, 10)
+    label(f, titleText, UDim2.fromOffset(13, 7), UDim2.new(1, -26, 0, 22), 17, C.text, Enum.Font.GothamBold)
+    label(f, subtitle, UDim2.fromOffset(14, 31), UDim2.new(1, -28, 0, 16), 10, C.muted)
+    return f
+end
 
 local nextLayoutOrder = 1
 local function ordered(obj)
@@ -162,19 +227,22 @@ local function ordered(obj)
     return obj
 end
 local function sectionTitle(text)
-    local f = ordered(make("Frame", {Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = C.panel, BorderSizePixel = 0}, body))
+    local f = ordered(make("Frame", {Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = C.panel, BorderSizePixel = 0}, activePage))
     corner(f, 7)
     label(f, text, UDim2.fromOffset(10, 0), UDim2.new(1, -20, 1, 0), 11, C.violet, Enum.Font.GothamBold)
 end
 local function infoCard(title, description, height)
-    local f = ordered(make("Frame", {Size = UDim2.new(1, 0, 0, height or 54), BackgroundColor3 = C.panel, BorderSizePixel = 0}, body))
+    local f = ordered(make("Frame", {Size = UDim2.new(1, 0, 0, height or 54), BackgroundColor3 = C.panel, BorderSizePixel = 0}, activePage))
     corner(f, 8)
     label(f, title, UDim2.fromOffset(11, 6), UDim2.new(1, -22, 0, 18), 12, C.text, Enum.Font.GothamBold)
     label(f, description, UDim2.fromOffset(11, 25), UDim2.new(1, -22, 1, -29), 10, C.muted)
     return f
 end
 
-sectionTitle("01  /  ROLE ESP")
+pageHeader("Visual", "Role ESP and player indicators")
+activePage = pages.Visual
+nextLayoutOrder = 1
+sectionTitle("ROLE ESP")
 infoCard("Automatic role labels", "Murderer = red  •  Sheriff = blue  •  Innocent = green", 44)
 local espStatus = infoCard("ESP: OFF", "Waiting for round data.", 46)
 local espStatusTitle = espStatus:FindFirstChildWhichIsA("TextLabel")
@@ -279,12 +347,12 @@ local function setESP(value)
     espToggle.BackgroundColor3 = value and C.violet or C.panel2
     updateESP()
 end
-espToggle = button(body, "ESP  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 38), function()
+espToggle = button(activePage, "ESP  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 38), function()
     setESP(not espEnabled)
 end)
 ordered(espToggle)
 
-local refreshButton = button(body, "↻  Refresh roles now", UDim2.new(), UDim2.new(1, 0, 0, 34), function()
+local refreshButton = button(activePage, "↻  Refresh roles now", UDim2.new(), UDim2.new(1, 0, 0, 34), function()
     refreshRoundData()
     updateESP()
 end, C.panel2)
@@ -317,7 +385,10 @@ Players.PlayerRemoving:Connect(function(p)
     task.defer(updateESP)
 end)
 
-sectionTitle("02  /  MOVEMENT")
+pageHeader("Misc", "Small quality-of-life options")
+activePage = pages.Misc
+nextLayoutOrder = 1
+sectionTitle("MOVEMENT")
 infoCard("Slightly faster", "Local test speed: 20 WalkSpeed. Toggle off to restore your original speed.", 44)
 local speedOn, originalSpeed = false, nil
 local speedToggle
@@ -337,7 +408,7 @@ local function setSpeed(value)
         end
     end
 end
-speedToggle = button(body, "RUN SPEED  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
+speedToggle = button(activePage, "RUN SPEED  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
     setSpeed(not speedOn)
 end, C.panel2)
 ordered(speedToggle)
@@ -349,7 +420,7 @@ player.CharacterAdded:Connect(function(char)
     end
 end)
 
-sectionTitle("03  /  NIGHT TEXTURE")
+sectionTitle("NIGHT TEXTURE")
 infoCard("Nightfall visual preset", "Dark blue night atmosphere, cool ambient light and subtle fog. Local visual effect.", 44)
 local nightOn = false
 local nightToggle
@@ -398,10 +469,68 @@ local function setNight(value)
         atmosphere, colorCorrection = nil, nil
     end
 end
-nightToggle = button(body, "NIGHT TEXTURE  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
+nightToggle = button(activePage, "NIGHT TEXTURE  •  OFF", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
     setNight(not nightOn)
 end, C.panel2)
 ordered(nightToggle)
+
+-- Restore local modifications when the UI is destroyed.
+gui.Destroying:Connect(function()
+    if speedOn then setSpeed(false) end
+    if nightOn then setNight(false) end
+    clearESP()
+end)
+
+-- Static informational pages and future feature placeholders.
+activePage = pages.Home
+nextLayoutOrder = 1
+pageHeader("Welcome to Starfall", "Your control center at a glance")
+infoCard("Session", "Player: " .. player.DisplayName .. "  •  Username: @" .. player.Name, 54)
+infoCard("Quick status", "Panel ready  •  Toggle key: K  •  Build: Starfall Control Center", 54)
+infoCard("Navigation", "Use the left menu to open Visual, Perks, Whitelist, Teleport and Misc.", 54)
+
+activePage = pages.Perks
+nextLayoutOrder = 1
+pageHeader("Perks", "Admin-only tools will be added here")
+infoCard("Coming soon", "Reserved for server-authorized admin perks. Permission checks should be validated by the game server.", 68)
+local perksPlaceholder = button(activePage, "ADMIN PERKS  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+    print("[Starfall] Admin perks are not configured yet.")
+end, C.panel2)
+ordered(perksPlaceholder)
+
+activePage = pages.Whitelist
+nextLayoutOrder = 1
+pageHeader("Whitelist", "Panel access list")
+infoCard("Access control", "This page is a UI placeholder. A client-side list cannot securely prevent other players from using scripts; enforce access on your own game server.", 82)
+local whitelistInput = make("TextBox", {
+    Size = UDim2.new(1, -5, 0, 36), BackgroundColor3 = C.panel,
+    BorderSizePixel = 0, PlaceholderText = "Enter username or UserId",
+    Text = "", TextColor3 = C.text, PlaceholderColor3 = C.muted,
+    Font = Enum.Font.Gotham, TextSize = 12, ClearTextOnFocus = false,
+}, activePage)
+corner(whitelistInput, 8)
+local whitelistNote = infoCard("No entries", "No access list has been saved. Configure authoritative permissions in the server script.", 54)
+local whitelistAdd = button(activePage, "＋  Add to local draft", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    local value = string.gsub(whitelistInput.Text, "^%s*(.-)%s*$", "%1")
+    if value ~= "" then
+        whitelistNote:FindFirstChildWhichIsA("TextLabel").Text = "Draft entry: " .. value
+        whitelistInput.Text = ""
+    end
+end, C.panel2)
+ordered(whitelistAdd)
+
+activePage = pages.Teleport
+nextLayoutOrder = 1
+pageHeader("Teleport", "Destinations and player jumps")
+infoCard("Map destinations", "Teleport points and map locations need named parts and server-side support in your own experience.", 66)
+local mapPlaceholder = button(activePage, "MAP DESTINATIONS  •  COMING SOON", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+    print("[Starfall] Map teleport destinations are not configured yet.")
+end, C.panel2)
+ordered(mapPlaceholder)
+local playerPlaceholder = button(activePage, "PLAYER TELEPORT  •  COMING SOON", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+    print("[Starfall] Player teleport is not configured yet.")
+end, C.panel2)
+ordered(playerPlaceholder)
 
 -- Restore local modifications when the UI is destroyed.
 gui.Destroying:Connect(function()
