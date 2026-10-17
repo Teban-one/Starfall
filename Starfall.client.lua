@@ -516,7 +516,8 @@ nextLayoutOrder = 1
 pageHeader("Perks", "Admin-only tools")
 infoCard("Autoshoot", "Prototype entry added. Target selection, firing and permissions are not implemented; configure only for an experience you own or administer.", 72)
 local autoshootEnabled = false
-local autoshootButton = button(activePage, "AUTOSHOOT  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+local autoshootButton
+autoshootButton = button(activePage, "AUTOSHOOT  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
     autoshootEnabled = not autoshootEnabled
     autoshootButton.Text = autoshootEnabled and "AUTOSHOOT  •  PLACEHOLDER ON" or "AUTOSHOOT  •  NOT CONFIGURED"
     autoshootButton.BackgroundColor3 = autoshootEnabled and C.violet or C.panel2
