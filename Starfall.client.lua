@@ -551,18 +551,119 @@ infoCard("Navigation", "Use the left menu to open Visual, Perks, Whitelist, Tele
 
 activePage = pages.Perks
 nextLayoutOrder = 1
-pageHeader("Perks", "Admin-only tools")
-infoCard("Autoshoot", "Prototype entry added. Target selection, firing and permissions are not implemented; configure only for an experience you own or administer.", 72)
-local autoshootEnabled = false
-local autoshootButton
-autoshootButton = button(activePage, "AUTOSHOOT  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
-    autoshootEnabled = not autoshootEnabled
-    autoshootButton.Text = autoshootEnabled and "AUTOSHOOT  •  PLACEHOLDER ON" or "AUTOSHOOT  •  NOT CONFIGURED"
-    autoshootButton.BackgroundColor3 = autoshootEnabled and C.violet or C.panel2
-    print("[Starfall] Autoshoot is a UI placeholder; no automatic firing is active.")
+pageHeader("Perks", "Admin tools and round utilities")
+sectionTitle("TARGET ASSIST CONFIG")
+infoCard("Aim assist", "Configuration panel for your own experience. Camera locking and weapon actions are intentionally not activated until your game's approved targeting and role rules are connected.", 68)
+
+local aimEnabled = false
+local aimMode = "Nearest"
+local aimRole = "Infection target"
+local aimFov = 150
+local aimMaxDistance = 300
+local aimStatus = infoCard("TARGET ASSIST: OFF", "Mode: Nearest  •  FOV: 150  •  Max distance: 300", 48)
+local aimStatusTitle, aimStatusDetail
+for _, child in ipairs(aimStatus:GetChildren()) do
+    if child:IsA("TextLabel") then
+        if child.Position.Y.Offset < 20 then aimStatusTitle = child else aimStatusDetail = child end
+    end
+end
+local aimToggle
+aimToggle = button(activePage, "TARGET ASSIST  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    aimEnabled = not aimEnabled
+    aimToggle.Text = aimEnabled and "TARGET ASSIST  •  CONFIGURED" or "TARGET ASSIST  •  OFF"
+    aimToggle.BackgroundColor3 = aimEnabled and C.violet or C.panel2
+    aimStatusTitle.Text = aimEnabled and "TARGET ASSIST: CONFIGURED" or "TARGET ASSIST: OFF"
+    print("[Starfall] Target settings updated. Connect these settings to your own game's authorized aim-assist system.")
 end, C.panel2)
-ordered(autoshootButton)
-infoCard("Admin permissions", "For a real admin perk, verify authorized UserIds on the server. A client toggle alone is not a security check.", 62)
+ordered(aimToggle)
+
+local function makeSettingRow(titleText, description, height)
+    local card = ordered(make("Frame", {Size = UDim2.new(1, -5, 0, height), BackgroundColor3 = C.panel, BorderSizePixel = 0}, activePage))
+    corner(card, 8)
+    label(card, titleText, UDim2.fromOffset(10, 5), UDim2.new(0.46, -10, 0, 20), 11, C.text, Enum.Font.GothamBold)
+    label(card, description, UDim2.fromOffset(10, 25), UDim2.new(0.46, -10, 1, -28), 9, C.muted)
+    return card
+end
+local modeRow = makeSettingRow("Target mode", "Nearest target selection", 54)
+local modeButton = button(modeRow, "NEAREST  ▾", UDim2.new(0.5, 0, 0.2, 0), UDim2.new(0.47, -8, 0, 32), function()
+    aimMode = aimMode == "Nearest" and "Lowest health" or (aimMode == "Lowest health" and "Closest to center" or "Nearest")
+    modeButton.Text = string.upper(aimMode) .. "  ▾"
+    if aimStatusDetail then aimStatusDetail.Text = ("Mode: %s  •  FOV: %d  •  Max distance: %d"):format(aimMode, aimFov, aimMaxDistance) end
+end, C.panel2)
+modeButton.TextSize = 10
+
+local roleRow = makeSettingRow("Role filter", "Choose eligible targets", 54)
+local roleButton = button(roleRow, "INFECTION TARGET  ▾", UDim2.new(0.5, 0, 0.2, 0), UDim2.new(0.47, -8, 0, 32), function()
+    local choices = {"Infection target", "Murderer", "Sheriff", "All opponents"}
+    local index = table.find(choices, aimRole) or 1
+    aimRole = choices[index % #choices + 1]
+    roleButton.Text = string.upper(aimRole) .. "  ▾"
+end, C.panel2)
+roleButton.TextSize = 9
+
+local fovRow = makeSettingRow("FOV radius", "Screen-space target radius", 64)
+local fovValue = label(fovRow, tostring(aimFov), UDim2.new(0.52, 0, 0, 5), UDim2.new(0.44, -8, 0, 18), 12, C.blue, Enum.Font.GothamBold)
+local fovMinus = button(fovRow, "−", UDim2.new(0.52, 0, 0, 29), UDim2.new(0, 34, 0, 27), function()
+    aimFov = math.max(10, aimFov - 10)
+    fovValue.Text = tostring(aimFov)
+    if aimStatusDetail then aimStatusDetail.Text = ("Mode: %s  •  FOV: %d  •  Max distance: %d"):format(aimMode, aimFov, aimMaxDistance) end
+end, C.panel2)
+local fovPlus = button(fovRow, "+", UDim2.new(0.52, 40, 0, 29), UDim2.new(0, 34, 0, 27), function()
+    aimFov = math.min(500, aimFov + 10)
+    fovValue.Text = tostring(aimFov)
+    if aimStatusDetail then aimStatusDetail.Text = ("Mode: %s  •  FOV: %d  •  Max distance: %d"):format(aimMode, aimFov, aimMaxDistance) end
+end, C.panel2)
+
+local distanceRow = makeSettingRow("Max distance", "World-space range", 64)
+local distanceValue = label(distanceRow, tostring(aimMaxDistance), UDim2.new(0.52, 0, 0, 5), UDim2.new(0.44, -8, 0, 18), 12, C.blue, Enum.Font.GothamBold)
+button(distanceRow, "−", UDim2.new(0.52, 0, 0, 29), UDim2.new(0, 34, 0, 27), function()
+    aimMaxDistance = math.max(35, aimMaxDistance - 25)
+    distanceValue.Text = tostring(aimMaxDistance)
+    if aimStatusDetail then aimStatusDetail.Text = ("Mode: %s  •  FOV: %d  •  Max distance: %d"):format(aimMode, aimFov, aimMaxDistance) end
+end, C.panel2)
+button(distanceRow, "+", UDim2.new(0.52, 40, 0, 29), UDim2.new(0, 34, 0, 27), function()
+    aimMaxDistance = math.min(600, aimMaxDistance + 25)
+    distanceValue.Text = tostring(aimMaxDistance)
+    if aimStatusDetail then aimStatusDetail.Text = ("Mode: %s  •  FOV: %d  •  Max distance: %d"):format(aimMode, aimFov, aimMaxDistance) end
+end, C.panel2)
+
+sectionTitle("ROUND UTILITIES")
+infoCard("Auto Gun Take", "Needs your experience's real gun-drop object and pickup/permission rules. This UI does not teleport or collect arbitrary objects.", 58)
+local autoGunEnabled = false
+local autoGunButton
+autoGunButton = button(activePage, "AUTO GUN TAKE  •  NOT CONNECTED", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    autoGunEnabled = not autoGunEnabled
+    autoGunButton.Text = autoGunEnabled and "AUTO GUN TAKE  •  CONFIG REQUESTED" or "AUTO GUN TAKE  •  NOT CONNECTED"
+    autoGunButton.BackgroundColor3 = autoGunEnabled and C.blue or C.panel2
+    print("[Starfall] Auto Gun Take preference changed; connect your game's pickup system before enabling behavior.")
+end, C.panel2)
+ordered(autoGunButton)
+
+local antiAfkEnabled = false
+local antiAfkButton
+infoCard("Anti-AFK", "Uses a normal client-side activity preference flag only; it does not spoof input or bypass game moderation.", 58)
+antiAfkButton = button(activePage, "ANTI-AFK  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    antiAfkEnabled = not antiAfkEnabled
+    antiAfkButton.Text = antiAfkEnabled and "ANTI-AFK  •  PREFERENCE ON" or "ANTI-AFK  •  OFF"
+    antiAfkButton.BackgroundColor3 = antiAfkEnabled and C.blue or C.panel2
+    print("[Starfall] Anti-AFK preference toggled. No synthetic input is generated.")
+end, C.panel2)
+ordered(antiAfkButton)
+
+sectionTitle("MOVEMENT TOOLS")
+infoCard("Noclip", "Admin movement mode must be authorized and applied by your own game's server. This switch is a request indicator only.", 58)
+local noclipEnabled = false
+local noclipButton
+noclipButton = button(activePage, "NOCLIP  •  SERVER SETUP REQUIRED", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    noclipEnabled = not noclipEnabled
+    noclipButton.Text = noclipEnabled and "NOCLIP  •  REQUESTED" or "NOCLIP  •  SERVER SETUP REQUIRED"
+    noclipButton.BackgroundColor3 = noclipEnabled and C.blue or C.panel2
+    print("[Starfall] Noclip request toggled; no collision changes occur without authorized server implementation.")
+end, C.panel2)
+ordered(noclipButton)
+
+sectionTitle("ADMIN PERMISSIONS")
+infoCard("Server authorization required", "Verify authorized UserIds on the server before allowing target assistance, collection, noclip, teleport, or other admin actions. Client toggles are not security checks.", 68)
 
 activePage = pages.Whitelist
 nextLayoutOrder = 1
