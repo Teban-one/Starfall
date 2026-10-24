@@ -76,6 +76,24 @@ corner(main, 14)
 outline(main, C.violet, 0.15)
 local mainScale = make("UIScale", {Scale = 1}, main)
 
+local function updateResponsiveScale()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local scaleX = (viewport.X - 24) / 650
+    local scaleY = (viewport.Y - 24) / 455
+    mainScale.Scale = math.clamp(math.min(scaleX, scaleY, 1), 0.55, 1)
+end
+updateResponsiveScale()
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale)
+end
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    task.defer(updateResponsiveScale)
+    local camera = workspace.CurrentCamera
+    if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale) end
+end)
+
 local top = make("Frame", {
     Name = "TopBar", Size = UDim2.new(1, 0, 0, 62),
     BackgroundColor3 = C.panel, BorderSizePixel = 0,
@@ -486,7 +504,7 @@ end, C.panel2)
 ordered(nightToggle)
 
 sectionTitle("ANTI FLYING")
-infoCard("Anti-flying protection", "UI placeholder only. Reliable protection against body-fling attacks must be implemented and validated by your game's server.", 66)
+infoCard("Anti-flying protection", "Not active yet. Real anti-fling protection must be validated by the server; this switch is only a UI status until that server logic exists.", 66)
 local antiFlyingEnabled = false
 local antiFlyingButton = button(activePage, "ANTI FLYING  •  NOT CONFIGURED", UDim2.new(), UDim2.new(1, 0, 0, 36), function()
     antiFlyingEnabled = not antiFlyingEnabled
@@ -508,7 +526,23 @@ activePage = pages.Home
 nextLayoutOrder = 1
 pageHeader("Welcome to Starfall", "Your control center at a glance")
 infoCard("Session", "Player: " .. player.DisplayName .. "  •  Username: @" .. player.Name, 54)
-infoCard("Quick status", "Panel ready  •  Toggle key: K  •  Build: Starfall Control Center", 54)
+local statusCard = infoCard("Quick status", "Panel ready  •  Toggle key: K  •  Build: Starfall Control Center", 54)
+local statusText = statusCard:FindFirstChildWhichIsA("TextLabel")
+local clockCard = infoCard("LOCAL TIME", "--:--:--", 54)
+local clockTitle = clockCard:FindFirstChildWhichIsA("TextLabel")
+local clockDetail = clockCard:FindFirstChildWhichIsA("TextLabel")
+-- Keep the dashboard useful without requiring any game-specific remotes.
+task.spawn(function()
+    while gui.Parent do
+        local now = DateTime.now():ToLocalTime()
+        local timeText = string.format("%02d:%02d:%02d", now.Hour, now.Minute, now.Second)
+        if clockTitle then clockTitle.Text = "LOCAL TIME  •  " .. timeText end
+        if clockDetail then
+            clockDetail.Text = string.format("%04d-%02d-%02d  •  Starfall is running", now.Year, now.Month, now.Day)
+        end
+        task.wait(1)
+    end
+end)
 infoCard("Navigation", "Use the left menu to open Visual, Perks, Whitelist, Teleport and Other.", 54)
 
 activePage = pages.Perks
