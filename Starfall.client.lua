@@ -529,8 +529,12 @@ infoCard("Session", "Player: " .. player.DisplayName .. "  •  Username: @" .. 
 local statusCard = infoCard("Quick status", "Panel ready  •  Toggle key: K  •  Build: Starfall Control Center", 54)
 local statusText = statusCard:FindFirstChildWhichIsA("TextLabel")
 local clockCard = infoCard("LOCAL TIME", "--:--:--", 54)
-local clockTitle = clockCard:FindFirstChildWhichIsA("TextLabel")
-local clockDetail = clockCard:FindFirstChildWhichIsA("TextLabel")
+local clockTitle, clockDetail
+for _, child in ipairs(clockCard:GetChildren()) do
+    if child:IsA("TextLabel") then
+        if child.Position.Y.Offset < 20 then clockTitle = child else clockDetail = child end
+    end
+end
 -- Keep the dashboard useful without requiring any game-specific remotes.
 task.spawn(function()
     while gui.Parent do
