@@ -697,19 +697,35 @@ sectionTitle("ROUND UTILITIES")
 infoCard("Auto Gun Take", "Needs your experience's real gun-drop object and pickup/permission rules. This UI does not teleport or collect arbitrary objects.", 58)
 local autoGunEnabled = false
 local autoGunButton
-autoGunButton = button(activePage, "AUTO GUN TAKE  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
-    autoGunEnabled = not autoGunEnabled
+local autoGunGeneration = 0
+local function setAutoGunTake(value)
+    autoGunEnabled = value
+    autoGunGeneration += 1
     autoGunButton.Text = autoGunEnabled and "AUTO GUN TAKE  •  ON" or "AUTO GUN TAKE  •  OFF"
     autoGunButton.BackgroundColor3 = autoGunEnabled and C.blue or C.panel2
-    if autoGunEnabled then
-        local ok, message = invokeStarfallAction("TeleportToGunDrop")
-        notifyStarfall(message)
-        if not ok then
-            autoGunEnabled = false
-            autoGunButton.Text = "AUTO GUN TAKE  •  OFF"
-            autoGunButton.BackgroundColor3 = C.panel2
-        end
+    if not autoGunEnabled then
+        notifyStarfall("Auto Gun Take desactivado.")
+        return
     end
+    local generation = autoGunGeneration
+    notifyStarfall("Auto Gun Take activado: buscando GunDrop...")
+    task.spawn(function()
+        local lastMessage = ""
+        while autoGunEnabled and generation == autoGunGeneration do
+            local ok, message = invokeStarfallAction("TeleportToGunDrop")
+            if not ok then
+                lastMessage = tostring(message)
+                -- A missing drop can be temporary while a round is changing; keep watching.
+            else
+                lastMessage = tostring(message)
+            end
+            task.wait(0.75)
+        end
+        if not autoGunEnabled and lastMessage ~= "" then notifyStarfall(lastMessage) end
+    end)
+end
+autoGunButton = button(activePage, "AUTO GUN TAKE  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    setAutoGunTake(not autoGunEnabled)
 end, C.panel2)
 ordered(autoGunButton)
 
@@ -725,7 +741,7 @@ end, C.panel2)
 ordered(antiAfkButton)
 
 sectionTitle("MOVEMENT TOOLS")
-infoCard("Noclip", "Admin movement mode must be authorized and applied by your own game's server. This switch is a request indicator only.", 58)
+infoCard("Noclip", "Applies no-collision to your character through the server test control. Toggle off to restore saved collisions.", 58)
 local noclipEnabled = false
 local noclipButton
 noclipButton = button(activePage, "NOCLIP  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
