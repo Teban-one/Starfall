@@ -88,6 +88,52 @@ local function handleAction(player, actionName, value)
         if not backpack then return false, "No se encontró Backpack." end
         tool:Clone().Parent = backpack
         return true, value .. " entregado para pruebas."
+    elseif actionName == "SetNoclip" then
+        if typeof(value) ~= "boolean" then return false, "Estado de noclip no válido." end
+        local character = player.Character
+        if not character then return false, "Tu personaje aún no está listo." end
+        character:SetAttribute("StarfallNoclip", value)
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if value then
+                    if part:GetAttribute("StarfallOriginalCanCollide") == nil then
+                        part:SetAttribute("StarfallOriginalCanCollide", part.CanCollide)
+                    end
+                    part.CanCollide = false
+                else
+                    local original = part:GetAttribute("StarfallOriginalCanCollide")
+                    if typeof(original) == "boolean" then part.CanCollide = original end
+                    part:SetAttribute("StarfallOriginalCanCollide", nil)
+                end
+            end
+        end
+        return true, value and "Noclip de prueba activado." or "Colisiones restauradas."
+    elseif actionName == "TeleportToGunDrop" then
+        local character = player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if not root then return false, "Tu personaje aún no está listo." end
+        local drop = workspace:FindFirstChild("GunDrop", true)
+        if not drop then return false, "No se encontró un objeto llamado GunDrop en Workspace." end
+        local targetCFrame
+        if drop:IsA("BasePart") then
+            targetCFrame = drop.CFrame
+        elseif drop:IsA("Model") then
+            targetCFrame = drop:GetPivot()
+        else
+            return false, "GunDrop debe ser un Part o Model."
+        end
+        character:PivotTo(targetCFrame + Vector3.new(0, 3, 0))
+        return true, "Teletransporte al GunDrop realizado."
+    elseif actionName == "TeleportToPlayer" then
+        if typeof(value) ~= "number" then return false, "Jugador no válido." end
+        local target = Players:GetPlayerByUserId(value)
+        local character = player.Character
+        local targetCharacter = target and target.Character
+        if not targetCharacter or not targetCharacter:FindFirstChild("HumanoidRootPart") or not character or not character:FindFirstChild("HumanoidRootPart") then
+            return false, "No se encontró el personaje de uno de los jugadores."
+        end
+        character:PivotTo(targetCharacter:GetPivot() * CFrame.new(3, 0, 0))
+        return true, "Teletransporte de prueba realizado."
     end
     return false, "Acción desconocida."
 end
