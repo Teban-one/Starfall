@@ -93,21 +93,38 @@ local function handleAction(player, actionName, value)
         local character = player.Character
         if not character then return false, "Tu personaje aún no está listo." end
         character:SetAttribute("StarfallNoclip", value)
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                if value then
-                    if part:GetAttribute("StarfallOriginalCanCollide") == nil then
-                        part:SetAttribute("StarfallOriginalCanCollide", part.CanCollide)
-                    end
-                    part.CanCollide = false
-                else
-                    local original = part:GetAttribute("StarfallOriginalCanCollide")
-                    if typeof(original) == "boolean" then part.CanCollide = original end
-                    part:SetAttribute("StarfallOriginalCanCollide", nil)
+        local function applyPart(part)
+            if not part:IsA("BasePart") then return end
+            if value then
+                if part:GetAttribute("StarfallOriginalCanCollide") == nil then
+                    part:SetAttribute("StarfallOriginalCanCollide", part.CanCollide)
                 end
+                part.CanCollide = false
+            else
+                local original = part:GetAttribute("StarfallOriginalCanCollide")
+                if typeof(original) == "boolean" then part.CanCollide = original end
+                part:SetAttribute("StarfallOriginalCanCollide", nil)
             end
         end
-        return true, value and "Noclip de prueba activado." or "Colisiones restauradas."
+        for _, part in ipairs(character:GetDescendants()) do applyPart(part) end
+        -- Keep newly added character parts consistent while noclip is enabled.
+        local oldConnection = character:FindFirstChild("StarfallNoclipWatcher")
+        if oldConnection then oldConnection:Destroy() end
+        if value then
+            local watcher = Instance.new("Folder")
+            watcher.Name = "StarfallNoclipWatcher"
+            watcher.Parent = character
+            local connection
+            connection = character.DescendantAdded:Connect(function(part)
+                if character:GetAttribute("StarfallNoclip") == true then
+                    task.defer(function()
+                        if part.Parent and character:GetAttribute("StarfallNoclip") == true then applyPart(part) end
+                    end)
+                end
+            end)
+            watcher.Destroying:Connect(function() if connection then connection:Disconnect() end end)
+        end
+        return true, value and "Noclip activado; nuevas partes incluidas." or "Noclip desactivado; colisiones originales restauradas."
     elseif actionName == "TeleportToGunDrop" then
         local character = player.Character
         local root = character and character:FindFirstChild("HumanoidRootPart")
