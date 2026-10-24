@@ -9,9 +9,26 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+local function invokeStarfallAction(actionName, value)
+    local remote = ReplicatedStorage:FindFirstChild("StarfallTestAction")
+    if not remote or not remote:IsA("RemoteFunction") then
+        return false, "No se encontró StarfallTestAction en ReplicatedStorage."
+    end
+    local ok, allowed, message = pcall(function()
+        return remote:InvokeServer(actionName, value)
+    end)
+    if not ok then return false, "Error al contactar con el servidor." end
+    return allowed == true, tostring(message or "")
+end
+
+local function notifyStarfall(message)
+    warn("[Starfall] " .. tostring(message))
+end
 
 local C = {
     bg = Color3.fromRGB(10, 13, 27),
@@ -516,6 +533,8 @@ ordered(antiFlyingButton)
 
 -- Restore local modifications when the UI is destroyed.
 gui.Destroying:Connect(function()
+    RunService:UnbindFromRenderStep("StarfallTargetAssist")
+    if noclipEnabled then invokeStarfallAction("SetNoclip", false) end
     if speedOn then setSpeed(false) end
     if nightOn then setNight(false) end
     clearESP()
@@ -570,12 +589,58 @@ end
 local aimToggle
 aimToggle = button(activePage, "TARGET ASSIST  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
     aimEnabled = not aimEnabled
-    aimToggle.Text = aimEnabled and "TARGET ASSIST  •  CONFIGURED" or "TARGET ASSIST  •  OFF"
+    aimToggle.Text = aimEnabled and "TARGET ASSIST  •  ON" or "TARGET ASSIST  •  OFF"
     aimToggle.BackgroundColor3 = aimEnabled and C.violet or C.panel2
-    aimStatusTitle.Text = aimEnabled and "TARGET ASSIST: CONFIGURED" or "TARGET ASSIST: OFF"
-    print("[Starfall] Target settings updated. Connect these settings to your own game's authorized aim-assist system.")
+    aimStatusTitle.Text = aimEnabled and "TARGET ASSIST: ON" or "TARGET ASSIST: OFF"
+    notifyStarfall(aimEnabled and "Target Assist activado." or "Target Assist desactivado.")
 end, C.panel2)
 ordered(aimToggle)
+
+-- Target selection runs locally for this experience; server still owns actual weapon damage.
+local function getTargetRole(target)
+    local role = roleFor(target)
+    if role then return role end
+    local teamName = target.Team and target.Team.Name
+    if teamName and roleColors[teamName] then return teamName end
+    return nil
+end
+RunService:BindToRenderStep("StarfallTargetAssist", Enum.RenderPriority.Camera.Value + 1, function(dt)
+    if not aimEnabled then return end
+    local camera = workspace.CurrentCamera
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not camera or not myRoot then return end
+    local center = camera.ViewportSize / 2
+    local best, bestScore = nil, math.huge
+    for _, target in ipairs(Players:GetPlayers()) do
+        if target ~= player then
+            local char = target.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local role = getTargetRole(target)
+            local allowedRole = aimRole == "All opponents"
+                or (aimRole == "Murderer" and role == "Murderer")
+                or (aimRole == "Sheriff" and role == "Sheriff")
+                or (aimRole == "Infection target" and role ~= nil and role ~= "Innocent")
+            if root and hum and hum.Health > 0 and allowedRole then
+                local distance = (root.Position - myRoot.Position).Magnitude
+                local screenPoint, onScreen = camera:WorldToViewportPoint(root.Position)
+                local screenDistance = (Vector2.new(screenPoint.X, screenPoint.Y) - center).Magnitude
+                if onScreen and distance <= aimMaxDistance and screenDistance <= aimFov then
+                    local score
+                    if aimMode == "Lowest health" then score = hum.Health
+                    elseif aimMode == "Closest to center" then score = screenDistance
+                    else score = distance end
+                    if score < bestScore then best, bestScore = root, score end
+                end
+            end
+        end
+    end
+    if best then
+        local desired = CFrame.lookAt(camera.CFrame.Position, best.Position)
+        camera.CFrame = camera.CFrame:Lerp(desired, math.clamp(dt * 8, 0, 1))
+    end
+end)
 
 local function makeSettingRow(titleText, description, height)
     local card = ordered(make("Frame", {Size = UDim2.new(1, -5, 0, height), BackgroundColor3 = C.panel, BorderSizePixel = 0}, activePage))
@@ -585,7 +650,8 @@ local function makeSettingRow(titleText, description, height)
     return card
 end
 local modeRow = makeSettingRow("Target mode", "Nearest target selection", 54)
-local modeButton = button(modeRow, "NEAREST  ▾", UDim2.new(0.5, 0, 0.2, 0), UDim2.new(0.47, -8, 0, 32), function()
+local modeButton
+modeButton = button(modeRow, "NEAREST  ▾", UDim2.new(0.5, 0, 0.2, 0), UDim2.new(0.47, -8, 0, 32), function()
     aimMode = aimMode == "Nearest" and "Lowest health" or (aimMode == "Lowest health" and "Closest to center" or "Nearest")
     modeButton.Text = string.upper(aimMode) .. "  ▾"
     if aimStatusDetail then aimStatusDetail.Text = ("Mode: %s  •  FOV: %d  •  Max distance: %d"):format(aimMode, aimFov, aimMaxDistance) end
@@ -593,7 +659,8 @@ end, C.panel2)
 modeButton.TextSize = 10
 
 local roleRow = makeSettingRow("Role filter", "Choose eligible targets", 54)
-local roleButton = button(roleRow, "INFECTION TARGET  ▾", UDim2.new(0.5, 0, 0.2, 0), UDim2.new(0.47, -8, 0, 32), function()
+local roleButton
+roleButton = button(roleRow, "INFECTION TARGET  ▾", UDim2.new(0.5, 0, 0.2, 0), UDim2.new(0.47, -8, 0, 32), function()
     local choices = {"Infection target", "Murderer", "Sheriff", "All opponents"}
     local index = table.find(choices, aimRole) or 1
     aimRole = choices[index % #choices + 1]
@@ -631,11 +698,19 @@ sectionTitle("ROUND UTILITIES")
 infoCard("Auto Gun Take", "Needs your experience's real gun-drop object and pickup/permission rules. This UI does not teleport or collect arbitrary objects.", 58)
 local autoGunEnabled = false
 local autoGunButton
-autoGunButton = button(activePage, "AUTO GUN TAKE  •  NOT CONNECTED", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+autoGunButton = button(activePage, "AUTO GUN TAKE  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
     autoGunEnabled = not autoGunEnabled
-    autoGunButton.Text = autoGunEnabled and "AUTO GUN TAKE  •  CONFIG REQUESTED" or "AUTO GUN TAKE  •  NOT CONNECTED"
+    autoGunButton.Text = autoGunEnabled and "AUTO GUN TAKE  •  ON" or "AUTO GUN TAKE  •  OFF"
     autoGunButton.BackgroundColor3 = autoGunEnabled and C.blue or C.panel2
-    print("[Starfall] Auto Gun Take preference changed; connect your game's pickup system before enabling behavior.")
+    if autoGunEnabled then
+        local ok, message = invokeStarfallAction("TeleportToGunDrop")
+        notifyStarfall(message)
+        if not ok then
+            autoGunEnabled = false
+            autoGunButton.Text = "AUTO GUN TAKE  •  OFF"
+            autoGunButton.BackgroundColor3 = C.panel2
+        end
+    end
 end, C.panel2)
 ordered(autoGunButton)
 
@@ -654,11 +729,15 @@ sectionTitle("MOVEMENT TOOLS")
 infoCard("Noclip", "Admin movement mode must be authorized and applied by your own game's server. This switch is a request indicator only.", 58)
 local noclipEnabled = false
 local noclipButton
-noclipButton = button(activePage, "NOCLIP  •  SERVER SETUP REQUIRED", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
-    noclipEnabled = not noclipEnabled
-    noclipButton.Text = noclipEnabled and "NOCLIP  •  REQUESTED" or "NOCLIP  •  SERVER SETUP REQUIRED"
-    noclipButton.BackgroundColor3 = noclipEnabled and C.blue or C.panel2
-    print("[Starfall] Noclip request toggled; no collision changes occur without authorized server implementation.")
+noclipButton = button(activePage, "NOCLIP  •  OFF", UDim2.new(), UDim2.new(1, -5, 0, 36), function()
+    local requested = not noclipEnabled
+    local ok, message = invokeStarfallAction("SetNoclip", requested)
+    notifyStarfall(message)
+    if ok then
+        noclipEnabled = requested
+        noclipButton.Text = noclipEnabled and "NOCLIP  •  ON" or "NOCLIP  •  OFF"
+        noclipButton.BackgroundColor3 = noclipEnabled and C.blue or C.panel2
+    end
 end, C.panel2)
 ordered(noclipButton)
 
@@ -690,12 +769,31 @@ activePage = pages.Teleport
 nextLayoutOrder = 1
 pageHeader("Teleport", "Destinations and player jumps")
 infoCard("Map destinations", "Teleport points and map locations need named parts and server-side support in your own experience.", 66)
-local mapPlaceholder = button(activePage, "MAP DESTINATIONS  •  COMING SOON", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
-    print("[Starfall] Map teleport destinations are not configured yet.")
+local mapPlaceholder = button(activePage, "TELEPORT TO TEST SPAWN", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+    local ok, message = invokeStarfallAction("TeleportTestPoint", "TestSpawn")
+    notifyStarfall(message)
 end, C.panel2)
 ordered(mapPlaceholder)
-local playerPlaceholder = button(activePage, "PLAYER TELEPORT  •  COMING SOON", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
-    print("[Starfall] Player teleport is not configured yet.")
+local playerPlaceholder = button(activePage, "TELEPORT TO NEAREST PLAYER", UDim2.new(), UDim2.new(1, -5, 0, 38), function()
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local nearest, nearestDistance
+    if myRoot then
+        for _, target in ipairs(Players:GetPlayers()) do
+            local char = target.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if target ~= player and root then
+                local distance = (root.Position - myRoot.Position).Magnitude
+                if not nearestDistance or distance < nearestDistance then nearest, nearestDistance = target, distance end
+            end
+        end
+    end
+    if nearest then
+        local ok, message = invokeStarfallAction("TeleportToPlayer", nearest.UserId)
+        notifyStarfall(message)
+    else
+        notifyStarfall("No se encontró otro jugador.")
+    end
 end, C.panel2)
 ordered(playerPlaceholder)
 
