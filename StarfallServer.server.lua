@@ -9,10 +9,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
 
-local STUDIO_ONLY = true
+local STUDIO_ONLY = false
 local ALLOWLIST_USER_IDS = {
-    -- If you later disable STUDIO_ONLY, add your Roblox numeric UserId here.
-    -- [123456789] = true,
+    -- Optional extra developer accounts: [123456789] = true,
 }
 local remote = ReplicatedStorage:FindFirstChild("StarfallTestAction")
 if remote and not remote:IsA("RemoteFunction") then remote:Destroy(); remote = nil end
@@ -28,7 +27,10 @@ local ALLOWED_TOOLS = {TestKnife = true, TestGun = true}
 local function isAuthorized(player)
     if STUDIO_ONLY and not RunService:IsStudio() then return false end
     if RunService:IsStudio() then return true end
-    return ALLOWLIST_USER_IDS[player.UserId] == true
+    -- In a user-owned experience, automatically authorize the actual creator.
+    -- Never trust a client-side whitelist for privileged server actions.
+    local isUserOwnedCreator = game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId
+    return isUserOwnedCreator or ALLOWLIST_USER_IDS[player.UserId] == true
 end
 local function handleAction(player, actionName, value)
     if typeof(actionName) ~= "string" or #actionName > 40 then return false, "Solicitud inválida." end
