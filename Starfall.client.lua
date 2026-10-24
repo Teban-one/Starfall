@@ -533,8 +533,6 @@ ordered(antiFlyingButton)
 
 -- Restore local modifications when the UI is destroyed.
 gui.Destroying:Connect(function()
-    RunService:UnbindFromRenderStep("StarfallTargetAssist")
-    if noclipEnabled then invokeStarfallAction("SetNoclip", false) end
     if speedOn then setSpeed(false) end
     if nightOn then setNight(false) end
     clearESP()
@@ -799,6 +797,8 @@ ordered(playerPlaceholder)
 
 -- Restore local modifications when the UI is destroyed.
 gui.Destroying:Connect(function()
+    RunService:UnbindFromRenderStep("StarfallTargetAssist")
+    if noclipEnabled then invokeStarfallAction("SetNoclip", false) end
     if speedOn then setSpeed(false) end
     if nightOn then setNight(false) end
     clearESP()
