@@ -10,6 +10,7 @@ local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local World = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -604,7 +605,7 @@ local function getTargetRole(target)
 end
 RunService:BindToRenderStep("StarfallTargetAssist", Enum.RenderPriority.Camera.Value + 1, function(dt)
     if not aimEnabled then return end
-    local camera = workspace.CurrentCamera
+    local camera = World.CurrentCamera
     local myChar = player.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not camera or not myRoot then return end
